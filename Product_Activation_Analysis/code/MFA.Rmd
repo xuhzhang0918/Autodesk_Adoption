@@ -1,0 +1,200 @@
+---
+title: "MFA"
+author: "Kaki"
+date: "2018/5/28"
+output: github_document
+---
+
+# load package and data
+```{r "setup", include=FALSE}
+work_dir <- dirname(getwd())
+print(work_dir)
+knitr::opts_knit$set(root.dir = work_dir)
+library(FactoMineR)
+library(factoextra)
+```
+
+# extract variables
+```{r}
+source("code/data_cleaning.R")
+```
+
+```{r}
+char<-complete_df%>%
+  select_if(~is.character(.x))
+num<-complete_df%>%
+  select_if(~is.numeric(.x))
+```
+
+there are 16 categorical variables and 60 numerical variables in the dataset.
+
+# group variables
+```{r}
+car<-num[23:60]%>%
+  select(car_pings_since_agreement_start_channel_partner_csn, car_pings_since_agreement_start_country_code)
+
+contract<-num[c(1:6,19)]
+
+active<-num[c(10:13, 15:18,20:21)]
+
+company<-num[c(7:9,14)]
+
+order<-char[1:12]
+
+segment<-char[13:16]
+
+char_num<-bind_cols(c(order,segment,contract,active,company,car))
+```
+
+# apply MFA
+```{r}
+res.MFA <-MFA(char_num, group = c(12,4,7,10,4,2), type = c(rep("n",2), rep("s",4)),
+              ncp=5, name.group=c("order","segment","contract","active","company","car"))
+```
+```{r}
+print(res.MFA)
+```
+
+#Get eigenvalues/ variances
+```{r}
+eig.val <- get_eigenvalue(res.MFA)
+head(eig.val)
+```
+
+#plot the percentage of explained variances for dimensions
+```{r}
+fviz_screeplot(res.MFA)
+```
+
+
+# graph of variables
+## group of variales
+
+```{r}
+group <- get_mfa_var(res.MFA, "group")
+group
+```
+
+###plot the groups of variables
+
+```{r}
+fviz_mfa_var(res.MFA, "group")
+```
+
+red color = active groups of variables
+green color = supplementary groups of variables
+The plot illustrates the correlation between groups and dimensions. The coordinates of the four active groups on the first dimension are almost identical. This means that they contribute similarly to the first dimension. "segment" contributes most to both dimension. Concerning the second dimension, "company"" have the second highest coordinates indicating a second highest contribution to the second dimension.
+
+### draw a bar plot of groups contribution to the dimensions
+```{r}
+fviz_contrib(res.MFA, "group", axes = 1)
+fviz_contrib(res.MFA, "group", axes = 2)
+```
+
+
+## quantitative variables
+```{r}
+quantity<-res.MFA$quanti.var$contrib
+quantity%>%abs()%>%View()
+
+quanti.var <- get_mfa_var(res.MFA, "quanti.var")
+quanti.var
+```
+
+
+```{r}
+## Coordinates
+head(quanti.var$coord)
+## Cos2: quality on the factore map
+head(quanti.var$cos2)
+## Contributions to the dimensions
+head(quanti.var$contrib)
+```
+
+###correlation between quantitative variables and dimensions
+```{r}
+fviz_mfa_var(res.MFA, "quanti.var", palette = "jco", 
+             col.var.sup = "violet", repel = TRUE)
+
+```
+
+To make the plot more readable, we can use geom = c(“point”, “text”) instead of geom = c(“arrow”, “text”). We’ll change also the legend position from “right” to “bottom”, using the argument legend = “bottom”:
+
+```{r}
+fviz_mfa_var(res.MFA, "quanti.var", palette = "jco", 
+             col.var.sup = "violet", repel = TRUE,
+             geom = c("point", "text"))
+```
+Briefly, the graph of variables (correlation circle) shows the relationship between variables, the quality of the representation of variables, as well as, the correlation between variables and the dimensions:
+
+* Positive correlated variables are grouped together, whereas negative ones are positioned on opposite sides of the plot origin (opposed quadrants).
+
+* The distance between variable points and the origin measures the quality of the variable on the factor map. Variable points that are away from the origin are well represented on the factor map.
+
+* For a given dimension, the most correlated variables to the dimension are close to the dimension.
+
+For example, the first dimension represents the positive sentiments about activation: “renewal_rate” and “total_billed_usd”. The most correlated variables to the second dimension are: i) parent_named_account_flg for the company group; ii) parent_owner_uuid_count for the activity group and 
+
+The contribution of quantitative variables (in %) to the definition of the dimensions can be visualized using the function fviz_contrib() [factoextra package]. Variables are colored by groups. The R code below shows the top 20 variable categories contributing to the dimensions:
+
+```{r}
+# Contributions to dimension 1
+fviz_contrib(res.MFA, choice = "quanti.var", axes = 1, top = 20,
+             palette = "jco", xtickslab.rt = 90)
+```
+
+```{r}
+# Contributions to dimension 2
+fviz_contrib(res.MFA, choice = "quanti.var", axes = 2, top = 20,
+             palette = "jco", xtickslab.rt = 90)
+```
+
+The red dashed line on the graph above indicates the expected average value, If the contributions were uniform. The calculation of the expected contribution value, under null hypothesis, has been detailed in the principal component analysis.
+
+The most contributing quantitative variables can be highlighted on the scatter plot using the argument col.var = “contrib”. This produces a gradient colors, which can be customized using the argument gradient.cols.
+
+```{r}
+fviz_mfa_var(res.MFA, "quanti.var", col.var = "contrib", 
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"), 
+             col.var.sup = "violet", repel = TRUE,
+             geom = c("point", "text"))
+```
+
+Similarly, we can highlight quantitative variables using their cos2 values representing the quality of representation on the factor map. If a variable is well represented by two dimensions, the sum of the cos2 is closed to one. For some of the row items, more than 2 dimensions might be required to perfectly represent the data.
+
+```{r}
+# Color by cos2 values: quality on the factor map
+fviz_mfa_var(res.MFA, col.var = "cos2",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"), 
+             col.var.sup = "violet", repel = TRUE)
+```
+
+To create a bar plot of variables cos2, type this:
+```{r}
+fviz_cos2(res.MFA, choice = "quanti.var", axes = 1)
+```
+## quantitative variables
+```{r}
+fviz_mfa_var(res.MFA, "quali.var", col.var = "contrib",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"), 
+             col.var.sup = "violet", repel = TRUE,
+             geom = c("point", "text"))
+```
+## Graph of partial axes
+
+The graph of partial axes shows the relationship between the principal axes of the MFA and the ones obtained from analyzing each group using either a PCA (for groups of continuous variables) or a MCA (for qualitative variables).
+
+```{r}
+fviz_mfa_axes(res.MFA)
+```
+
+# Summary
+The multiple factor analysis (MFA) makes it possible to analyse individuals characterized by multiple sets of variables. In this article, we described how to perform and interpret MFA using FactoMineR and factoextra R packages.
+
+# Further reading
+For the mathematical background behind MFA, refer to the following video courses, articles and books:
+
+Multiple Factor Analysis Course Using FactoMineR (Video courses). https://goo.gl/WcmHHt.
+Exploratory Multivariate Analysis by Example Using R (book) (F. Husson, Le, and Pagès 2017).
+Principal component analysis (article) (Abdi and Williams 2010). https://goo.gl/1Vtwq1.
+Simultaneous analysis of distinct Omics data sets with integration of biological knowledge: Multiple Factor Analysis approach (Tayrac et al. 2009).

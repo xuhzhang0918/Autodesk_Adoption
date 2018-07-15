@@ -1,0 +1,88 @@
+---
+title: "README"
+author: "UC Davis - Autodesk Adoption team"
+date: "2018-6-30"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE
+)
+library(tidyverse)
+library(R.utils)
+```
+
+
+```{r}
+all_files <- list.files(all.files = T,recursive = T)
+
+# R files
+r_files_flag <- all_files %>%
+    str_detect("\\.R$")
+r_files <- all_files[r_files_flag]
+r_files_link <- r_files %>%
+    str_replace_all(" ", "%20")
+R_table <- tibble(file_name = glue::glue("[{r_files}]({r_files_link})"),
+       lines_of_code = map_dbl(r_files,~length(readLines(.x))),
+       description = "")
+
+
+# Ipython Notebook
+notebook_files_flag <- all_files %>%
+    str_detect("\\.ipynb$")
+notebook_files <- all_files[notebook_files_flag] 
+notebook_files_link <- notebook_files %>%
+    str_replace_all(" ", "%20")
+notebook_table <- tibble(file_name = glue::glue("[{notebook_files}]({notebook_files_link})"),
+                  lines_of_code = map_dbl(notebook_files,~length(readLines(.x))),
+                  description = "")
+
+## data files
+data_files_flag <- all_files %>%
+    str_detect("(\\.csv$)|(\\.tsv$)|(\\.RData)")
+data_files <- all_files[data_files_flag] 
+data_files_link <- data_files %>%
+    str_replace_all(" ", "%20")
+data_table <- tibble(file_name = glue::glue("[{data_files}]({data_files_link})"),
+                  lines_of_code = map_dbl(data_files,~length(readLines(.x))),
+                  description = "")
+## image files
+image_files_flag <- all_files %>%
+    str_detect("(\\.png$)|(\\.jpeg$)")
+image_files <- all_files[image_files_flag] 
+image_files_link <- image_files %>%
+    str_replace_all(" ", "%20")
+image_table <- tibble(file_name = glue::glue("[{image_files}]({image_files_link})"),
+                  lines_of_code = map_dbl(image_files,~length(readLines(.x))),
+                  description = "")
+
+```
+
+## R Files:
+```{r}
+R_table %>%
+    mutate(index = row_number()) %>%
+    select(index,everything()) %>%
+    knitr::kable()
+```
+
+## Jupyter Notebooks:
+
+```{r}
+notebook_table %>%
+    mutate(index = row_number()) %>%
+    select(index,everything()) %>%
+    knitr::kable()
+```
+
+## Data Files
+```{r}
+data_table[!str_detect(data_files,"^\\."),] %>%
+    mutate(index = row_number()) %>%
+    select(index,everything()) %>%
+    knitr::kable()
+```
+

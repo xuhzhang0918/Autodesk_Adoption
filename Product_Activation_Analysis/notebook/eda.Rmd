@@ -1,0 +1,246 @@
+---
+title: "autodesk eda"
+author: "kaki"
+date: "3/26/2018"
+output: github_document
+---
+
+```{r}
+setwd("~/autodesk_git/autodesk_adoption2")
+getwd()
+```
+
+
+```{r}
+source("/code/load_data.R",local = TRUE)
+#dataset is save to variable dataset
+```
+
+```{r}
+filter<-dplyr::filter
+```
+
+
+```{r}
+library(Hmisc)
+describe(dataset)
+```
+# check NA
+
+```{r}
+colSums(sapply(dataset, is.na))
+```
+
+plot NA for each column
+```{r}
+plot_Missing <- function(data_in, title = NULL){
+  temp_df <- as.data.frame(ifelse(is.na(data_in), 0, 1))
+  temp_df <- temp_df[,order(colSums(temp_df))]
+  data_temp <- expand.grid(list(y = 1:nrow(temp_df), x = colnames(temp_df)))
+  data_temp$m <- as.vector(as.matrix(temp_df))
+  data_temp <- data.frame(y = unlist(data_temp$x), x = unlist(data_temp$y), m = unlist(data_temp$m))
+  
+  ggplot(data_temp) + 
+    geom_tile(aes(x=x, y=y, fill=factor(m))) + 
+    scale_fill_manual(values=c("white", "black"), name="Missing\n(0=Yes, 1=No)") + 
+    theme_light() + 
+    ylab("\n") + 
+    xlab("\n") + 
+    ggtitle(title)+
+    #theme(axis.title.y = element_text(margin = margin(t = 20, r = 20, b = 20, l = 20)))+
+    theme(axis.text.y = element_text(angle = 10, hjust = 1))
+    
+}
+
+plot_Missing(dataset[,colSums(is.na(dataset)) > 0])
+```
+categorical
+```{r}
+fac_col<-sapply(dataset, is.factor)
+fac_df<-dataset[fac_col]
+fac_name<-colnames(fac_df)
+fac_name
+```
+
+```{r}
+dataset%>%
+  filter(agreement_status == 'Active')%>%
+  select(order_source, onboarding_score)%>%
+  group_by(order_source)%>%
+  #summarise(count= n())%>%
+  ggplot(aes(x= onboarding_score))+
+  geom_freqpoly(mapping = aes(colour = order_source))
+  
+```
+
+```{r}
+data%>%
+  filter(agreement_status == 'Active')%>%
+  select(channel_partner_type, onboarding_score)%>%
+  group_by(channel_partner_type)%>%
+  ggplot(aes(x= onboarding_score))+
+  geom_freqpoly(mapping = aes(colour = channel_partner_type))
+  
+```
+
+
+
+```{r}
+draw_freq<-function(df,col,type){
+  ggplot(data = df, aes_string(x = col))+
+    geom_freqpoly(aes_string(color = type))
+}
+
+factors<-fac_name[1:30]
+score<-'onboarding_score'
+
+
+for(i in 1:length(factors)){
+  fact = factors[i]
+  plots<-dataset%>%
+    filter(agreement_status == 'Active')%>%
+    select_(fact,score)%>%
+    group_by_(fact)
+  my_plot <- draw_freq(plots, score, fact)
+  
+  print(my_plot)
+  
+}
+```
+
+
+# segmentation by geo
+```{r}
+geos <- unique(dataset$geo_cd)
+geos
+
+countries <-unique(dataset$country_name)
+countries
+```
+
+#segmentation by industry
+```{r}
+industry_groups <-unique(dataset$hier_industry_group_name)
+industry_groups
+
+industry_segs <-unique(dataset$hier_industry_segment_name)
+industry_segs
+```
+# segmentation by customer size 
+```{r}
+sizes <- unique(dataset$customer_size_code)
+sizes
+```
+# segmentation by account type
+```{r}
+accounts <-unique(dataset$account_type_name)
+accounts
+```
+# segmentation by channel parter type
+```{r}
+channels <-unique(dataset$channel_partner_type)
+channels
+```
+# segmentation by status
+```{r}
+status <-unique(dataset$agreement_status)
+status
+```
+# segmentation by bmt market
+```{r}
+bmt_market<-unique(dataset$bmt_market)
+bmt_market
+```
+
+
+# car system
+```{r}
+
+## for Civil Infrastructure in America
+car<-dataset%>%
+  filter(support_health=='Negative' &
+           geo_cd == 'Americas' &
+           country_name =='United States'&
+           hier_industry_group_name == 'AEC' &
+           hier_industry_segment_name == 'Civil Infrastructure'&
+           #customer_size_code =='VSB'&
+           #channel_partner_type == 'Distributor'&
+           agreement_status == 'Active'&
+           bmt_market =='Mature'
+         
+           )%>%
+  select(order_number, car_pings_in_last_7_days,car_pings_in_previous_one_month, car_pings_in_previous_second_month, car_pings_in_previous_third_month, car_pings_in_previous_fourth_month, customer_size_code)%>%
+  gather(period, pings, -order_number, -customer_size_code)%>%
+  mutate(period = factor(x = period,levels = c('car_pings_in_previous_fourth_month', 'car_pings_in_previous_third_month', 'car_pings_in_previous_second_month', 'car_pings_in_previous_one_month', 'car_pings_in_last_7_days')))
+
+
+
+
+x<-quantile(car$pings,c(0.25,0.75))
+car_clean <- car[car$pings>= x[1] & car$pings<=x[2], ]
+describe(car_clean$pings)
+
+```
+Visualize car system pings
+
+```{r fig.height=50, fig.width=10}
+
+  ggplot(data = car, aes(period, order_number)) +
+  geom_tile(aes(fill = pings), color = "white") +
+  scale_fill_gradient(low = "white", high = "steelblue") +
+  ylab("List of order ") +
+  xlab("period") +
+  facet_grid(customer_size_code ~.)+
+  theme(legend.title = element_text(size = 10 ),
+        legend.text = element_text(size = 10),
+        plot.title = element_text(size=10),
+        axis.title=element_text(size=5,face="bold"),
+        axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(fill = "car pings")
+
+```
+
+
+# combination different filters
+```{r fig.height=200, fig.width=10}
+for(geo in geos){
+  for(in_seg in industry_segs){
+    for(size in sizes){
+      subdata<-dataset%>%
+        filter(support_health=='Negative' &
+           geo_cd == geo &
+           #country_name =='United States'&
+           #hier_industry_group_name == 'AEC' &
+           hier_industry_segment_name == in_seg &
+           customer_size_code == size &
+           #channel_partner_type == 'Distributor'&
+           
+           agreement_status == 'Active'&
+           bmt_market =='Mature'
+         
+           )%>%
+  select(order_number, car_pings_in_last_7_days,car_pings_in_previous_one_month, car_pings_in_previous_second_month, car_pings_in_previous_third_month, car_pings_in_previous_fourth_month, channel_partner_type)%>%
+  gather(period, pings, -order_number, -channel_partner_type)%>%
+  mutate(period = factor(x = period,levels = c('car_pings_in_previous_fourth_month', 'car_pings_in_previous_third_month', 'car_pings_in_previous_second_month', 'car_pings_in_previous_one_month', 'car_pings_in_last_7_days')))
+      
+      
+        p <-ggplot(data = subdata, aes(period, order_number)) +
+          geom_tile(aes(fill = pings), color = "white") +
+          scale_fill_gradient(low = "white", high = "steelblue") +
+          ylab("List of order ") +
+          xlab("period") +
+          #facet_grid(channel_partner_type ~.)+
+          theme(legend.title = element_text(size = 10 ),
+                legend.text = element_text(size = 10),
+                plot.title = element_text(size=10),
+                axis.title=element_text(size=10,face="bold"),
+                axis.text.x = element_text(angle = 90, hjust = 1)) +
+          labs(fill = str_c(cbind(geo, in_seg, size), collapse = " "))
+        print(p)
+        print(str_c(cbind(geo, in_seg, size), collapse = " "))
+    }
+  }
+
+}
+```
+
